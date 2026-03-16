@@ -242,21 +242,38 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
   let statusLines: string[] = [];
 
   const updateStatus = async (thinkingLabel: string) => {
-    // Parse "ToolName:detail" or just "ToolName"
-    const colonIdx = thinkingLabel.indexOf(':');
-    const toolName = colonIdx >= 0 ? thinkingLabel.slice(0, colonIdx) : thinkingLabel;
-    const detail = colonIdx >= 0 ? thinkingLabel.slice(colonIdx + 1) : '';
+    let line: string;
 
-    const emoji = TOOL_EMOJI[toolName] || '\u{2699}\u{FE0F}';
-    const verb = TOOL_VERB[toolName] || toolName;
+    if (thinkingLabel.startsWith('_thought:')) {
+      // Agent's reasoning text
+      const thought = thinkingLabel.slice('_thought:'.length);
+      line = `\u{1F4AD} _${thought}_`;
+    } else if (thinkingLabel.startsWith('_task:')) {
+      // Subagent task notification
+      const task = thinkingLabel.slice('_task:'.length);
+      line = `\u{1F465} ${task}`;
+    } else {
+      // Tool use — parse "ToolName:detail" or just "ToolName"
+      const colonIdx = thinkingLabel.indexOf(':');
+      const toolName =
+        colonIdx >= 0 ? thinkingLabel.slice(0, colonIdx) : thinkingLabel;
+      const detail = colonIdx >= 0 ? thinkingLabel.slice(colonIdx + 1) : '';
 
-    // Shorten paths: /workspace/extra/CleaveStudio/... → CleaveStudio/...
-    const shortDetail = detail.replace(/^\/workspace\/extra\//, '').replace(/^\/workspace\/group\//, '');
+      const emoji = TOOL_EMOJI[toolName] || '\u{2699}\u{FE0F}';
+      const verb = TOOL_VERB[toolName] || toolName;
 
-    const line = shortDetail ? `${emoji} ${verb} \`${shortDetail}\`` : `${emoji} ${verb}`;
+      const shortDetail = detail
+        .replace(/^\/workspace\/extra\//, '')
+        .replace(/^\/workspace\/group\//, '');
+
+      line = shortDetail
+        ? `${emoji} ${verb} \`${shortDetail}\``
+        : `${emoji} ${verb}`;
+    }
+
     statusLines.push(line);
-    // Show last 4 lines
-    const display = statusLines.slice(-4).join('\n');
+    // Show last 5 lines
+    const display = statusLines.slice(-5).join('\n');
 
     if (!statusMsgId && channel.sendTrackedMessage) {
       statusMsgId = await channel.sendTrackedMessage(chatJid, display);
@@ -267,7 +284,10 @@ async function processGroupMessages(chatJid: string): Promise<boolean> {
 
   // Send initial status immediately (before container starts)
   if (channel.sendTrackedMessage) {
-    statusMsgId = await channel.sendTrackedMessage(chatJid, '\u{23F3} Starting...');
+    statusMsgId = await channel.sendTrackedMessage(
+      chatJid,
+      '\u{23F3} Starting...',
+    );
   }
 
   const clearStatus = async () => {

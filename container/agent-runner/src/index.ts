@@ -456,14 +456,24 @@ async function runQuery(
       log(`Task notification: task=${tn.task_id} status=${tn.status} summary=${tn.summary}`);
     }
 
-    // Emit thinking status for tool use events so the host can show progress
+    // Emit thinking status for assistant messages so the host can show progress
     if (message.type === 'assistant') {
-      const msg = message as { message?: { content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }> } };
+      const msg = message as { message?: { content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }> } };
       const content = msg.message?.content;
       if (content) {
         for (const block of content) {
+          // Text blocks — agent's reasoning/thoughts
+          if (block.type === 'text' && block.text) {
+            const truncated = block.text.length > 120
+              ? block.text.slice(0, 120) + '...'
+              : block.text;
+            // Only emit if it's not just whitespace
+            if (truncated.trim()) {
+              writeOutput({ status: 'success', result: null, thinking: `_thought:${truncated.trim()}` });
+            }
+          }
+          // Tool use blocks — what tools the agent is calling
           if (block.type === 'tool_use' && block.name) {
-            // Extract meaningful detail from tool arguments
             let detail = '';
             const input = block.input || {};
             if (block.name === 'Read' && input.file_path) detail = String(input.file_path);
@@ -478,6 +488,14 @@ async function runQuery(
             writeOutput({ status: 'success', result: null, thinking: label });
           }
         }
+      }
+    }
+
+    // Emit subagent task notifications
+    if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
+      const tn = message as { task_id: string; status: string; summary: string };
+      if (tn.summary) {
+        writeOutput({ status: 'success', result: null, thinking: `_task:${tn.status}: ${tn.summary}` });
       }
     }
 
