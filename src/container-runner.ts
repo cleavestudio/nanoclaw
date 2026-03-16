@@ -4,6 +4,7 @@
  */
 import { ChildProcess, exec, spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import {
@@ -48,6 +49,7 @@ export interface ContainerOutput {
   result: string | null;
   newSessionId?: string;
   error?: string;
+  thinking?: string;
 }
 
 interface VolumeMount {
@@ -162,6 +164,16 @@ function buildVolumeMounts(
     containerPath: '/home/node/.claude',
     readonly: false,
   });
+
+  // MCP auth tokens (OAuth tokens for external MCP servers like ClickUp)
+  const mcpAuthDir = path.join(os.homedir(), '.mcp-auth');
+  if (fs.existsSync(mcpAuthDir)) {
+    mounts.push({
+      hostPath: mcpAuthDir,
+      containerPath: '/home/node/.mcp-auth',
+      readonly: true,
+    });
+  }
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC

@@ -34,6 +34,7 @@ interface ContainerOutput {
   result: string | null;
   newSessionId?: string;
   error?: string;
+  thinking?: string;
 }
 
 interface SessionEntry {
@@ -407,7 +408,8 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
+        'mcp__clickup__*'
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -421,6 +423,13 @@ async function runQuery(
             NANOCLAW_CHAT_JID: containerInput.chatJid,
             NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+          },
+        },
+        clickup: {
+          command: 'npx',
+          args: ['-y', 'mcp-remote', 'https://mcp.clickup.com/mcp'],
+          env: {
+            MCP_REMOTE_CONFIG_DIR: '/home/node/.mcp-auth',
           },
         },
       },
@@ -445,6 +454,31 @@ async function runQuery(
     if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
       const tn = message as { task_id: string; status: string; summary: string };
       log(`Task notification: task=${tn.task_id} status=${tn.status} summary=${tn.summary}`);
+    }
+
+    // Emit thinking status for tool use events so the host can show progress
+    if (message.type === 'assistant') {
+      const msg = message as { message?: { content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }> } };
+      const content = msg.message?.content;
+      if (content) {
+        for (const block of content) {
+          if (block.type === 'tool_use' && block.name) {
+            // Extract meaningful detail from tool arguments
+            let detail = '';
+            const input = block.input || {};
+            if (block.name === 'Read' && input.file_path) detail = String(input.file_path);
+            else if (block.name === 'Write' && input.file_path) detail = String(input.file_path);
+            else if (block.name === 'Edit' && input.file_path) detail = String(input.file_path);
+            else if (block.name === 'Bash' && input.command) detail = String(input.command).slice(0, 80);
+            else if (block.name === 'Glob' && input.pattern) detail = String(input.pattern);
+            else if (block.name === 'Grep' && input.pattern) detail = String(input.pattern);
+            else if (block.name === 'WebSearch' && input.query) detail = String(input.query);
+            else if (block.name === 'WebFetch' && input.url) detail = String(input.url).slice(0, 60);
+            const label = detail ? `${block.name}:${detail}` : block.name;
+            writeOutput({ status: 'success', result: null, thinking: label });
+          }
+        }
+      }
     }
 
     if (message.type === 'result') {
