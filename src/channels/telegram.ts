@@ -291,10 +291,7 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async sendTrackedMessage(
-    jid: string,
-    text: string,
-  ): Promise<number | null> {
+  async sendTrackedMessage(jid: string, text: string): Promise<number | null> {
     if (!this.bot) return null;
     try {
       const numericId = jid.replace(/^tg:/, '');
@@ -320,10 +317,7 @@ export class TelegramChannel implements Channel {
     }
   }
 
-  async deleteMessage(
-    jid: string,
-    messageId: number | string,
-  ): Promise<void> {
+  async deleteMessage(jid: string, messageId: number | string): Promise<void> {
     if (!this.bot) return;
     try {
       const numericId = jid.replace(/^tg:/, '');
