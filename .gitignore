@@ -35,4 +35,8 @@ groups/global/*
 # Skills system (local per-installation state)
 .nanoclaw/
 
+# Private skills (project-specific, not for public repo)
+.claude/skills/daily/
+.claude/skills/sprint/
+
 agents-sdk-docs
